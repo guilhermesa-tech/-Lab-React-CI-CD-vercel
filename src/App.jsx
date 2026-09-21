@@ -7,7 +7,9 @@ const logs = [
   ['09:42:21', 'ready', 'Deployment ready'],
 ]
 
-const deployVersion = import.meta.env.VITE_DEPLOY_VERSION || 'local'
+const isVercel = __IS_VERCEL__
+const deployEnvironment = __VERCEL_ENV__
+const deployVersion = __DEPLOY_VERSION__
 
 function App() {
   return (
@@ -26,7 +28,7 @@ function App() {
           <h1>Deploy <em>online.</em></h1>
           <p className="intro-copy">Um painel mínimo para conferir o resultado do seu pipeline.</p>
         </div>
-        <div className="status-badge"><span className="status-dot" /> pronto</div>
+        <div className="status-badge"><span className="status-dot" /> {isVercel ? 'publicado na Vercel' : 'ambiente local'}</div>
       </section>
 
       <section className="summary-grid" aria-label="Resumo do deployment">
@@ -48,7 +50,7 @@ function App() {
         <article className="summary-card version-card">
           <span className="card-label">VERSION</span>
           <strong>{deployVersion}</strong>
-          <small>Identificação do build</small>
+          <small>{isVercel ? `${deployEnvironment} • Vercel` : 'Identificação local'}</small>
         </article>
       </section>
 
@@ -69,7 +71,7 @@ function App() {
             </div>
           ))}
         </div>
-        <p className="panel-note">Amostra visual dos passos definidos em <code>ci.yaml</code> e <code>cd.yaml</code>.</p>
+        <p className="panel-note">Build identificado por <code>{deployVersion}</code>. {isVercel ? 'Este bundle foi gerado pela Vercel.' : 'Este bundle está rodando localmente.'}</p>
       </section>
 
       <footer className="footer">
