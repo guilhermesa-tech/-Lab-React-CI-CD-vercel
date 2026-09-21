@@ -7,6 +7,8 @@ const logs = [
   ['09:42:21', 'ready', 'Deployment ready'],
 ]
 
+const deployVersion = import.meta.env.VITE_DEPLOY_VERSION || 'local'
+
 function App() {
   return (
     <main className="shell">
@@ -42,6 +44,11 @@ function App() {
           <span className="card-label">BUILD</span>
           <strong>42s</strong>
           <small>Vite production build</small>
+        </article>
+        <article className="summary-card version-card">
+          <span className="card-label">VERSION</span>
+          <strong>{deployVersion}</strong>
+          <small>Identificação do build</small>
         </article>
       </section>
 
