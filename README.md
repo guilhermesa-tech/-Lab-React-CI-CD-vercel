@@ -51,16 +51,19 @@ flowchart TD
 - **Docker:** usa um build multi-stage. A primeira imagem executa o build com Node.js; a segunda serve `dist` com Nginx.
 - **Nginx:** entrega os arquivos estaticos e redireciona rotas desconhecidas para `index.html`, permitindo fallback de aplicacoes SPA.
 - **Vercel:** recebe o build pre-built gerado pelo CLI da Vercel no workflow de CD.
+- **API de deployment:** `api/deployment.js` consulta o ultimo deployment de producao pela API da Vercel. O frontend atualiza essa coleta a cada 15 segundos sem expor o token.
 
-Durante o build, `vite.config.js` injeta tres valores globais no frontend:
+Durante o build, `vite.config.js` injeta valores globais no frontend:
 
 | Valor | Origem | Uso |
 | --- | --- | --- |
 | `__IS_VERCEL__` | `process.env.VERCEL === '1'` | Indica se o bundle foi gerado pela Vercel. |
 | `__VERCEL_ENV__` | `process.env.VERCEL_ENV` | Exibe o ambiente Vercel atual. |
 | `__DEPLOY_VERSION__` | `VERCEL_GIT_COMMIT_SHA` ou `local` | Identifica o commit do deployment. |
+| `__VERCEL_GIT_COMMIT_REF__` | `VERCEL_GIT_COMMIT_REF` ou `local` | Identifica a branch do deployment. |
+| `__BUILD_TIMESTAMP__` | Relogio do processo de build | Fallback local quando a API da Vercel nao esta disponivel. |
 
-Esses valores sao de build-time, nao configuracoes lidas dinamicamente pelo navegador em runtime.
+Os valores de build sao estaticos. Em producao, status, inicio, fim e duracao do deployment vem de `/api/deployment`, que consulta os dados atuais da Vercel.
 
 ## Pre-requisitos
 
@@ -179,7 +182,14 @@ As credenciais sao usadas apenas pelo runner e nao devem ser adicionadas ao repo
 3. Obtenha o ID da conta ou time no painel da Vercel.
 4. Gere um token com permissao suficiente para vincular e publicar o projeto.
 5. Cadastre os tres valores como secrets do ambiente `production` no repositorio GitHub.
-6. Faça merge em `main` ou envie um commit diretamente para essa branch.
+6. No projeto Vercel, cadastre `VERCEL_API_TOKEN`, `VERCEL_PROJECT_ID` e, se o projeto pertencer a um time, `VERCEL_ORG_ID` como variaveis de ambiente de producao. A funcao `api/deployment.js` usa essas variaveis em runtime.
+7. Faça merge em `main` ou envie um commit diretamente para essa branch.
+
+### Coleta em tempo real
+
+Quando publicado na Vercel, o painel chama `GET /api/deployment` ao abrir e a cada 15 segundos. A resposta fornece o status atual, branch, commit, horario de criacao, inicio do build e horario em que o deployment ficou pronto.
+
+No desenvolvimento local e na imagem Docker, essa funcao serverless nao e executada pelo Nginx. Nesse caso, a tela mostra os metadados do build e deixa o status da API indisponivel, sem fabricar horarios de etapas.
 
 ## Docker
 
@@ -210,6 +220,8 @@ O arquivo `.dockerignore` exclui `node_modules`, `dist`, `.git`, `.github` e log
 ├── .github/workflows/
 │   ├── ci.yaml              # Lint, auditoria, build e smoke test Docker
 │   └── cd.yaml              # Build e deploy de producao na Vercel
+├── api/
+│   └── deployment.js        # Consulta o ultimo deployment na API da Vercel
 ├── public/                  # Arquivos estaticos publicos
 ├── src/
 │   ├── assets/              # Imagens e assets usados pela aplicacao
@@ -255,6 +267,3 @@ O CD so e disparado por pushes em `main`. Verifique tambem se os tres secrets es
 
 Confirme `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` e `VERCEL_TOKEN`. O workflow remove `.vercel` antes de vincular o projeto para evitar configuracoes antigas no runner.
 
-## Licenca
-
-Este repositorio e um projeto de estudo de CI/CD.
