@@ -39,6 +39,13 @@ export default async function handler(request, response) {
       return response.status(404).json({ error: 'No production deployment found' })
     }
 
+    const completedAt = deployment.readyAt || deployment.completedAt || null
+    const createdTimestamp = Number(deployment.createdAt)
+    const completedTimestamp = Number(completedAt)
+    const durationMs = Number.isFinite(createdTimestamp) && Number.isFinite(completedTimestamp)
+      ? Math.max(0, completedTimestamp - createdTimestamp)
+      : null
+
     response.setHeader('Cache-Control', 'no-store, max-age=0')
     return response.status(200).json({
       id: deployment.uid,
@@ -46,7 +53,8 @@ export default async function handler(request, response) {
       url: deployment.url ? `https://${deployment.url}` : null,
       createdAt: deployment.createdAt || null,
       buildingAt: deployment.buildingAt || null,
-      readyAt: deployment.readyAt || null,
+      readyAt: completedAt,
+      durationMs,
       target: deployment.target || 'production',
       branch: deployment.meta?.githubCommitRef || null,
       commit: deployment.meta?.githubCommitSha?.slice(0, 7) || null,

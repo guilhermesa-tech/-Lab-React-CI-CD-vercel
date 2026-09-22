@@ -52,6 +52,7 @@ flowchart TD
 - **Nginx:** entrega os arquivos estaticos e redireciona rotas desconhecidas para `index.html`, permitindo fallback de aplicacoes SPA.
 - **Vercel:** recebe o build pre-built gerado pelo CLI da Vercel no workflow de CD.
 - **API de deployment:** `api/deployment.js` consulta o ultimo deployment de producao pela API da Vercel. O frontend atualiza essa coleta a cada 15 segundos sem expor o token.
+- **API de pipeline:** `api/pipeline.js` consulta os jobs e steps do GitHub Actions para mostrar os horarios reais de lint, teste, build, Docker e deploy.
 
 Durante o build, `vite.config.js` injeta valores globais no frontend:
 
@@ -106,10 +107,11 @@ O comando `preview` serve o conteudo de `dist` localmente e nao substitui o serv
 | `npm run dev` | Inicia o servidor de desenvolvimento do Vite. |
 | `npm run lint` | Executa o Oxlint. |
 | `npm run build` | Gera o bundle de producao em `dist`. |
+| `npm test` | Executa os testes nativos com Node.js. |
 | `npm run preview` | Serve localmente o bundle gerado. |
 | `npm audit --audit-level=high` | Falha quando encontra vulnerabilidades de severidade alta ou critica. |
 
-O projeto nao possui atualmente um script `test`; por isso o CI usa `npm test --if-present` e apenas executa testes se esse script for adicionado ao `package.json`.
+O teste atual valida a conversao dos timestamps da Vercel e o calculo da duracao do deployment. O CI executa esse teste antes do build.
 
 ## CI
 
@@ -183,11 +185,14 @@ As credenciais sao usadas apenas pelo runner e nao devem ser adicionadas ao repo
 4. Gere um token com permissao suficiente para vincular e publicar o projeto.
 5. Cadastre os tres valores como secrets do ambiente `production` no repositorio GitHub.
 6. No projeto Vercel, cadastre `VERCEL_API_TOKEN`, `VERCEL_PROJECT_ID` e, se o projeto pertencer a um time, `VERCEL_ORG_ID` como variaveis de ambiente de producao. A funcao `api/deployment.js` usa essas variaveis em runtime.
-7. Faça merge em `main` ou envie um commit diretamente para essa branch.
+7. Cadastre `GITHUB_TOKEN` com permissao de leitura de Actions e `GITHUB_REPOSITORY` no formato `owner/repositorio`. A funcao `api/pipeline.js` usa essas variaveis para consultar os logs do CI/CD.
+8. Faça merge em `main` ou envie um commit diretamente para essa branch.
 
 ### Coleta em tempo real
 
 Quando publicado na Vercel, o painel chama `GET /api/deployment` ao abrir e a cada 15 segundos. A resposta fornece o status atual, branch, commit, horario de criacao, inicio do build e horario em que o deployment ficou pronto.
+
+O painel tambem chama `GET /api/pipeline` no mesmo intervalo. O endpoint busca a ultima execucao de `ci.yaml` e `cd.yaml` em `main`, incluindo `started_at`, `completed_at`, status e conclusao de cada step. Assim, o historico mostra a sequencia real apos o merge, em vez de horarios simulados.
 
 No desenvolvimento local e na imagem Docker, essa funcao serverless nao e executada pelo Nginx. Nesse caso, a tela mostra os metadados do build e deixa o status da API indisponivel, sem fabricar horarios de etapas.
 
@@ -222,9 +227,11 @@ O arquivo `.dockerignore` exclui `node_modules`, `dist`, `.git`, `.github` e log
 │   └── cd.yaml              # Build e deploy de producao na Vercel
 ├── api/
 │   └── deployment.js        # Consulta o ultimo deployment na API da Vercel
+│   └── pipeline.js           # Consulta jobs e steps do GitHub Actions
 ├── public/                  # Arquivos estaticos publicos
 ├── src/
 │   ├── assets/              # Imagens e assets usados pela aplicacao
+│   ├── deployment.js         # Conversao e formatacao de duracoes
 │   ├── App.jsx              # Interface principal do painel
 │   ├── App.css              # Estilos da interface
 │   ├── index.css            # Estilos globais
@@ -236,6 +243,8 @@ O arquivo `.dockerignore` exclui `node_modules`, `dist`, `.git`, `.github` e log
 ├── package.json             # Scripts e dependencias
 ├── package-lock.json        # Versoes exatas das dependencias
 └── vite.config.js           # Plugin React e variaveis de build
+├── tests/
+│   └── deployment.test.js    # Testes de timestamps e duracao
 ```
 
 ## Troubleshooting
