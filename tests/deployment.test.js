@@ -15,5 +15,6 @@ test('calcula a duracao com timestamps numericos ou ISO', () => {
 test('formata duracoes curtas e longas', () => {
   assert.equal(formatDuration(42000), '42s')
   assert.equal(formatDuration(125000), '2m 5s')
+  assert.equal(formatDuration(Number.NaN), 'indisponivel')
   assert.equal(formatDuration(null), 'indisponivel')
 })

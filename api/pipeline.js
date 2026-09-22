@@ -1,10 +1,12 @@
 const githubRequest = async (url, token) => {
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  }
+  if (token) headers.Authorization = `Bearer ${token}`
+
   const response = await fetch(url, {
-    headers: {
-      Accept: 'application/vnd.github+json',
-      Authorization: `Bearer ${token}`,
-      'X-GitHub-Api-Version': '2022-11-28',
-    },
+    headers,
   })
 
   if (!response.ok) throw new Error(`GitHub API returned ${response.status}`)
@@ -66,13 +68,16 @@ export default async function handler(request, response) {
     return response.status(405).json({ error: 'Method not allowed' })
   }
 
-  const token = process.env.GITHUB_TOKEN
+  const token = process.env.GITHUB_TOKEN || null
   const repository = process.env.GITHUB_REPOSITORY
+    || [process.env.VERCEL_GIT_REPO_OWNER, process.env.VERCEL_GIT_REPO_SLUG]
+      .filter(Boolean)
+      .join('/')
 
-  if (!token || !repository) {
+  if (!repository) {
     return response.status(503).json({
       error: 'GitHub Actions API is not configured',
-      detail: 'Configure GITHUB_TOKEN and GITHUB_REPOSITORY in Vercel.',
+      detail: 'Configure GITHUB_REPOSITORY in Vercel. GITHUB_TOKEN is required for private repositories.',
     })
   }
 

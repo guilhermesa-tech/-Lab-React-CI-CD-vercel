@@ -5,7 +5,6 @@ import './App.css'
 const isVercel = __IS_VERCEL__
 const deployEnvironment = __VERCEL_ENV__
 const deployVersion = __DEPLOY_VERSION__
-const buildTimestamp = __BUILD_TIMESTAMP__
 const buildBranch = __VERCEL_GIT_COMMIT_REF__
 
 const formatDateTime = (timestamp) => {
@@ -74,9 +73,9 @@ const getPipelineLogs = (pipeline) => {
 function App() {
   const [now, setNow] = useState(() => Date.now())
   const [deployment, setDeployment] = useState({
-    status: isVercel ? 'READY' : null,
-    createdAt: buildTimestamp,
-    readyAt: isVercel ? buildTimestamp : null,
+    status: null,
+    createdAt: null,
+    readyAt: null,
     branch: buildBranch,
     commit: deployVersion,
     source: 'build',
@@ -89,8 +88,6 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (!isVercel) return undefined
-
     let active = true
     const collectDeployment = async () => {
       try {
@@ -118,7 +115,10 @@ function App() {
 
     collectDeployment()
     collectPipeline()
-    const collector = window.setInterval(collectDeployment, 15000)
+    const collector = window.setInterval(() => {
+      collectDeployment()
+      collectPipeline()
+    }, 15000)
     return () => {
       active = false
       window.clearInterval(collector)
@@ -128,8 +128,9 @@ function App() {
   const logs = getLogs(deployment)
   const pipelineLogs = getPipelineLogs(pipeline)
   const statusLabel = getStatusLabel(deployment.status)
-  const branch = deployment.branch || buildBranch
-  const version = deployment.commit || deployVersion
+  const latestRun = pipeline?.cd || pipeline?.ci
+  const branch = deployment.branch || latestRun?.branch || buildBranch
+  const version = deployment.commit || latestRun?.commit || deployVersion
   const readyAt = deployment.readyAt
   const apiDuration = Number(deployment.durationMs)
   const durationMilliseconds = Number.isFinite(apiDuration)

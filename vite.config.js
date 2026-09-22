@@ -9,6 +9,5 @@ export default defineConfig({
     __VERCEL_ENV__: JSON.stringify(process.env.VERCEL_ENV || 'local'),
     __DEPLOY_VERSION__: JSON.stringify(process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || 'local'),
     __VERCEL_GIT_COMMIT_REF__: JSON.stringify(process.env.VERCEL_GIT_COMMIT_REF || 'local'),
-    __BUILD_TIMESTAMP__: JSON.stringify(new Date().toISOString()),
   },
 })
