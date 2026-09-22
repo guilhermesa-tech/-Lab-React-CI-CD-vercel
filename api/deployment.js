@@ -40,8 +40,8 @@ export default async function handler(request, response) {
     }
 
     const completedAt = deployment.readyAt || deployment.completedAt || null
-    const createdTimestamp = Number(deployment.createdAt)
-    const completedTimestamp = Number(completedAt)
+    const createdTimestamp = deployment.createdAt == null ? null : Number(deployment.createdAt)
+    const completedTimestamp = completedAt == null ? null : Number(completedAt)
     const durationMs = Number.isFinite(createdTimestamp) && Number.isFinite(completedTimestamp)
       ? Math.max(0, completedTimestamp - createdTimestamp)
       : null
@@ -56,8 +56,10 @@ export default async function handler(request, response) {
       readyAt: completedAt,
       durationMs,
       target: deployment.target || 'production',
-      branch: deployment.meta?.githubCommitRef || null,
-      commit: deployment.meta?.githubCommitSha?.slice(0, 7) || null,
+      branch: deployment.meta?.githubCommitRef || process.env.VERCEL_GIT_COMMIT_REF || null,
+      commit: deployment.meta?.githubCommitSha?.slice(0, 7)
+        || process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7)
+        || null,
     })
   } catch {
     return response.status(502).json({ error: 'Could not reach Vercel API' })
