@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { formatDuration, getDurationMilliseconds } from './deployment.js'
 import './App.css'
 
 const isVercel = __IS_VERCEL__
@@ -26,13 +27,6 @@ const formatTime = (timestamp) => {
   }).format(new Date(timestamp))
 }
 
-const formatDuration = (start, end) => {
-  if (!start || !end) return 'indisponivel'
-
-  const seconds = Math.max(0, Math.round((end - start) / 1000))
-  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`
-}
-
 const getStatusLabel = (status) => {
   if (status === 'READY') return 'Deployment ready'
   if (status === 'BUILDING') return 'Build em andamento'
@@ -52,6 +46,31 @@ const getLogs = (deployment) => {
   return logs
 }
 
+const getStepType = (name) => {
+  const normalizedName = name.toLowerCase()
+  if (normalizedName.includes('lint')) return 'lint'
+  if (normalizedName.includes('test')) return 'test'
+  if (normalizedName.includes('build')) return 'build'
+  if (normalizedName.includes('docker')) return 'docker'
+  if (normalizedName.includes('deploy')) return 'deploy'
+  if (normalizedName.includes('audit')) return 'audit'
+  return 'ci'
+}
+
+const getPipelineLogs = (pipeline) => {
+  if (!pipeline) return []
+
+  return [pipeline.ci, pipeline.cd]
+    .filter(Boolean)
+    .flatMap((run) => run.jobs.flatMap((job) => job.steps.map((step) => ({
+      time: step.startedAt || step.completedAt || run.createdAt,
+      type: getStepType(step.name),
+      message: `${run.name}: ${step.name}`,
+      status: step.conclusion || step.status,
+    }))))
+    .sort((first, second) => new Date(first.time) - new Date(second.time))
+}
+
 function App() {
   const [now, setNow] = useState(() => Date.now())
   const [deployment, setDeployment] = useState({
@@ -62,6 +81,7 @@ function App() {
     commit: deployVersion,
     source: 'build',
   })
+  const [pipeline, setPipeline] = useState(null)
 
   useEffect(() => {
     const clock = window.setInterval(() => setNow(Date.now()), 1000)
@@ -84,7 +104,20 @@ function App() {
       }
     }
 
+    const collectPipeline = async () => {
+      try {
+        const response = await fetch('/api/pipeline', { cache: 'no-store' })
+        if (!response.ok) return
+
+        const currentPipeline = await response.json()
+        if (active) setPipeline(currentPipeline)
+      } catch {
+        // O painel continua usando os dados da Vercel se o GitHub estiver indisponivel.
+      }
+    }
+
     collectDeployment()
+    collectPipeline()
     const collector = window.setInterval(collectDeployment, 15000)
     return () => {
       active = false
@@ -93,11 +126,16 @@ function App() {
   }, [])
 
   const logs = getLogs(deployment)
+  const pipelineLogs = getPipelineLogs(pipeline)
   const statusLabel = getStatusLabel(deployment.status)
   const branch = deployment.branch || buildBranch
   const version = deployment.commit || deployVersion
-  const readyAt = deployment.readyAt || buildTimestamp
-  const buildDuration = formatDuration(deployment.createdAt, deployment.readyAt)
+  const readyAt = deployment.readyAt
+  const apiDuration = Number(deployment.durationMs)
+  const durationMilliseconds = Number.isFinite(apiDuration)
+    ? apiDuration
+    : getDurationMilliseconds(deployment.createdAt, deployment.readyAt)
+  const buildDuration = formatDuration(durationMilliseconds)
   const dataSource = deployment.source === 'vercel-api' ? 'Vercel API' : 'metadados do build'
 
   return (
@@ -123,7 +161,7 @@ function App() {
         <article className="summary-card highlight">
           <span className="card-label">STATUS</span>
           <strong>{statusLabel}</strong>
-          <small>{formatDateTime(readyAt)}</small>
+          <small>{readyAt ? formatDateTime(readyAt) : 'Em andamento'}</small>
         </article>
         <article className="summary-card">
           <span className="card-label">BRANCH</span>
@@ -151,7 +189,13 @@ function App() {
           <span className="live-label"><span className="live-dot" /> {isVercel ? 'live' : 'local'}</span>
         </div>
         <div className="logs" role="log" aria-label="Logs da ultima execucao">
-          {logs.map(([time, type, message]) => (
+          {pipelineLogs.length > 0 ? pipelineLogs.map((entry) => (
+            <div className="log-line" key={`${entry.time}-${entry.type}-${entry.message}`}>
+              <time dateTime={new Date(entry.time).toISOString()}>{formatTime(entry.time)}</time>
+              <span className={`log-type ${entry.type}`}>{entry.type}</span>
+              <span>{entry.message} ({entry.status})</span>
+            </div>
+          )) : logs.map(([time, type, message]) => (
             <div className="log-line" key={`${time}-${type}`}>
               <time dateTime={new Date(time).toISOString()}>{formatTime(time)}</time>
               <span className={`log-type ${type}`}>{type}</span>
