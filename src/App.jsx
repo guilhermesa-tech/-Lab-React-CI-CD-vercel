@@ -17,7 +17,7 @@ function App() {
       <header className="topbar">
         <a className="brand" href="/" aria-label="Pipeline Lab início">
           <span className="brand-mark">PL</span>
-          <span>Pipeline Labb</span>
+          <span>Pipeline Lab</span>
         </a>
         <span className="study-tag">PRODUCTION / MAIN</span>
       </header>
